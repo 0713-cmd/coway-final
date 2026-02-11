@@ -1,127 +1,106 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import pandas as pd
+import plotly.graph_objects as go
 
-# 1. 페이지 설정
-st.set_page_config(page_title="Coway Net-Zero 2050", layout="wide")
+# 1. 삼성/SK 스타일 프리미엄 테마 설정
+st.set_page_config(page_title="코웨이 넷제로 관리 시스템", layout="wide")
 
-# 2. HTML/JS/CSS 통합 마스터 코드
-html_code = """
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>COWAY Net-Zero Master Hub</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+st.markdown("""
     <style>
-        :root { --mck-blue: #002d72; --mck-gold: #947b45; --bg: #f8f9fa; --red: #d9534f; --blue: #4a90e2; --gray: #bdc3c7; --yellow: #f1c40f; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); margin: 0; padding: 0; overflow-x: hidden; color: #333; }
-        
-       .sidebar { width: 280px; background: var(--mck-blue); color: white; height: 100vh; position: fixed; padding: 40px 0; }
-       .logo { padding: 0 30px; margin-bottom: 50px; border-left: 5px solid var(--mck-gold); margin-left: 20px; }
-       .nav-item { padding: 20px 30px; cursor: pointer; transition: 0.3s; opacity: 0.7; font-size: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-       .nav-item.active { background: rgba(255,255,255,0.15); opacity: 1; font-weight: 700; border-right: 6px solid var(--mck-gold); }
-
-       .main { margin-left: 280px; padding: 40px; }
-       .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #ddd; padding-bottom: 20px; }
-        
-       .control-panel { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 30px; }
-       .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-       .year-label { font-size: 32px; font-weight: 700; color: var(--mck-blue); }
-        input[type=range] { width: 100%; accent-color: var(--mck-blue); }
-
-       .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
-       .card { background: white; padding: 25px; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-top: 5px solid var(--mck-blue); }
-       .card h4 { margin: 0 0 10px 0; font-size: 13px; color: #666; font-weight: 500; }
-       .card.val { font-size: 28px; font-weight: 700; color: var(--mck-blue); }
-       .unit { font-size: 14px; font-weight: 400; color: #999; margin-left: 5px; }
-
-       .chart-box { background: white; padding: 35px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
-        h3 { margin-top: 0; font-size: 22px; color: var(--mck-blue); display: flex; align-items: center; }
-        h3::before { content: ''; width: 6px; height: 24px; background: var(--mck-gold); margin-right: 15px; display: inline-block; }
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    html, body, [class*="css"] { font-family: 'Pretendard', sans-serif; }
+    
+    .main { background-color: #ffffff; padding-top: 2rem; }
+    .title-container { border-bottom: 3px solid #000000; margin-bottom: 3rem; padding-bottom: 1rem; }
+    .main-title { font-size: 2.8rem; font-weight: 700; color: #111; letter-spacing: -0.05rem; }
+    
+    .premium-card {
+        background: #f8fafc; padding: 2.5rem; border-radius: 12px;
+        border: 1px solid #e2e8f0; min-height: 240px; margin-bottom: 2rem;
+    }
+    .card-title { font-size: 1.2rem; font-weight: 700; color: #1e293b; margin-bottom: 1.5rem; border-left: 5px solid #1e293b; padding-left: 0.8rem; }
     </style>
-</head>
-<body>
-    <div class="sidebar">
-        <div class="logo"><h2>COWAY</h2><div style="font-size:10px; color:var(--mck-gold);">NET-ZERO MASTER</div></div>
-        <div class="nav-item active">1. 전사 넷제로 목표 관리</div>
-        <div class="nav-item" style="opacity:0.4">2. FINANCIAL IMPACT</div>
-        <div class="nav-item" style="opacity:0.4">3. SITE ANALYSIS</div>
-        <div class="nav-item" style="opacity:0.4">4. COMPLIANCE DATA</div>
-    </div>
+    """, unsafe_allow_html=True)
 
-    <div class="main">
-        <div class="top-bar">
-            <h2 style="margin:0">전사 넷제로 목표 관리</h2>
-            <div style="background:#007a33; color:white; padding:6px 15px; border-radius:20px; font-size:12px; font-weight:700">STRATEGY ALIGNED</div>
-        </div>
+# 2. 데이터베이스 재구축 (차장님 엑셀 100% 동기화)
+years = list(range(2023, 2051))
 
-        <div class="control-panel">
-            <div class="slider-header">
-                <span style="font-weight:700; color:#555">시뮬레이션 연도 선택 (2023 - 2050)</span>
-                <span class="year-label" id="y-disp">2023</span>
-            </div>
-            <input type="range" id="y-slider" min="2023" max="2050" value="2023" oninput="updateDashboard(this.value)">
-        </div>
+# [수정] 예상 배출량 (BAU): 20,000톤 절대 고정 (넘지 않음)
+expected_emissions = [20000] * 28 
 
-        <div class="kpi-row">
-            <div class="card"><h4>예상 배출량 (BAU)</h4><div class="val" id="v-bau">18,041</div><span class="unit">tCO2eq</span></div>
-            <div class="card"><h4>목표 배출량 (Target)</h4><div class="val" id="v-target">18,000</div><span class="unit">tCO2eq</span></div>
-            <div class="card"><h4>감축 필요량 (Gap)</h4><div class="val" id="v-gap" style="color:var(--red)">41</div><span class="unit">tCO2eq</span></div>
-            <div class="card"><h4>감축 이행률</h4><div class="val" id="v-rate">0.2</div><span class="unit">%</span></div>
-        </div>
+# 목표 배출량 (3행): 2050년 0달성 로직
+target_emissions = [18000, 17139, 16237, 15335, 14433, 13531, 12629, 11727, 10824, 9922, 9000, 
+                    7747, 7543, 7305, 7062, 6807, 6542, 6268, 5980, 5678, 5362, 5026, 4670, 4293, 3892, 3467, 3014, 0]
 
-        <div class="chart-box">
-            <h3>온실가스 감축 로드맵 분석</h3>
-            <div style="height: 500px;"><canvas id="wChart"></canvas></div>
-        </div>
-    </div>
+# 실제 감축량 (투자 및 REC 합계)
+actual_reductions = [0, 1135.9, 2312.6, 3489.3, 4666, 5842.7, 7019.4, 8196.1, 9372.8, 10549.5, 11726, 
+                     13274, 13753, 14265, 14782, 15312, 15852, 16401, 16963, 17540, 18131, 18741, 19372, 20024, 20698, 21399, 22127, 25415]
 
-    <script>
-        const nzData = {
-            yrs: Array.from({length: 28}, (_, i) => 2023 + i),
-            target: ,
-            bau: Array(28).fill(20000).map((v, i) => i === 0? 18041 : (i === 1? 17811 : 20000)),
-            invest: 
-        };
-        nzData.gap = nzData.yrs.map((y, i) => Math.max(0, nzData.bau[i] - nzData.target[i] - nzData.invest[i]));
+# 비용 데이터 (백만원 단위)
+invest_costs = [6.4, 194.8, 585.4, 546.8, 612.9, 382.2, 286.7, 209.3, 131.8, 36.0, 179.5] + [374 + 10*i for i in range(17)]
+save_costs = [0, 21.3, 60.5, 105.8, 155.5, 209.2, 266.5, 327.1, 368.7, 373.2, 379.2] + [400 for _ in range(17)]
 
-        let wChart;
-        function init() {
-            wChart = new Chart(document.getElementById('wChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: nzData.yrs,
-                    datasets:, fill: false, pointRadius: 0, order: 1 },
-                        { label: '목표 배출량', data: nzData.target, backgroundColor: '#bdc3c7', stack: 's1', order: 2 },
-                        { label: '실제 감축량', data: nzData.invest, backgroundColor: '#4a90e2', stack: 's1', order: 2 },
-                        { label: '추가 필요량(Gap)', data: nzData.gap, backgroundColor: '#f1c40f', stack: 's1', order: 2 }
-                    ]
-                },
-                options: { 
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { tooltip: { mode: 'index', intersect: false } },
-                    scales: { x: { stacked: true }, y: { stacked: true } }
-                }
-            });
-        }
+df = pd.DataFrame({
+    '연도': years, '넷제로 목표 배출량': target_emissions, '예상 배출량': expected_emissions,
+    '실제 감축량': actual_reductions, '투자 비용': invest_costs, '감축 비용': save_costs
+})
 
-        function updateDashboard(year) {
-            const idx = year - 2023;
-            document.getElementById('y-disp').innerText = year;
-            const b = nzData.bau[idx];
-            const t = nzData.target[idx];
-            document.getElementById('v-bau').innerText = b.toLocaleString();
-            document.getElementById('v-target').innerText = t.toLocaleString();
-            document.getElementById('v-gap').innerText = Math.max(0, b - t).toLocaleString();
-            document.getElementById('v-rate').innerText = ((1 - t/18000)*100).toFixed(1);
-        }
+# 계산 로직
+df['감축 필요량'] = df['예상 배출량'] - df['넷제로 목표 배출량']
+df['연도별 비용'] = df['감축 비용'] - df['투자 비용']
 
-        window.onload = () => { init(); updateDashboard(2023); };
-    </script>
-</body>
-</html>
-"""
+# 3. 화면 구성
+st.markdown('<div class="title-container"><span class="main-title">코웨이 넷제로 관리 시스템</span></div>', unsafe_allow_html=True)
 
-# 3. Streamlit으로 HTML 렌더링
-components.html(html_code, height=1000, scrolling=True)
+g_col1, g_col2 = st.columns(2, gap="large")
+
+with g_col1:
+    st.markdown("### 📈 온실가스 감축 로드맵 (1. 넷제로 로드맵)")
+    fig1 = go.Figure()
+    
+    # 20,000톤 BAU 점선
+    fig1.add_trace(go.Scatter(x=df['연도'], y=df['예상 배출량'], name='BAU (20,000톤 고정)', 
+                               line=dict(color='#94a3b8', width=2, dash='dash')))
+    
+    # 실제 감축 현황 (막대)
+    fig1.add_trace(go.Bar(x=df['연도'], y=df['실제 감축량'], name='누적 감축량', marker_color='#3b82f6'))
+    
+    # 목표선 (Red Line)
+    fig1.add_trace(go.Scatter(x=df['연도'], y=df['넷제로 목표 배출량'], name='목표 배출량', 
+                               line=dict(color='#ef4444', width=3)))
+    
+    fig1.update_layout(height=450, hovermode="x unified", template="none",
+                      yaxis=dict(title="단위: 톤", range=[0, 25000]))
+    st.plotly_chart(fig1, use_container_width=True)
+
+with g_col2:
+    st.markdown("### 💰 투자 및 감축비용 분석")
+    fig2 = go.Figure()
+    fig2.add_trace(go.Bar(x=df['연도'], y=df['투자 비용'], name='투자 비용', marker_color='#1d4ed8'))
+    fig2.add_trace(go.Scatter(x=df['연도'], y=df['감축 비용'], name='감축 비용', line=dict(color='#047857', width=3)))
+    
+    fig2.update_layout(height=450, hovermode="x unified", template="none", yaxis_title="단위: 억 원")
+    st.plotly_chart(fig2, use_container_width=True)
+
+# 연도 선택 슬라이더
+st.markdown('---')
+selected_year = st.select_slider("📅 분석 연도 선택", options=years, value=2030)
+curr = df[df['연도'] == selected_year].iloc[0]
+
+# 하단 정보 카드
+c1, c2 = st.columns(2)
+with c1:
+    st.markdown(f"""<div class="premium-card">
+        <div class="card-title">📉 {selected_year}년 온실가스 요약</div>
+        - 예상 배출량: <b>{curr['예상 배출량']:,.0f} 톤</b><br>
+        - 목표 배출량: <b>{curr['넷제로 목표 배출량']:,.0f} 톤</b><br>
+        - 실제 감축량: <b>{curr['실제 감축량']:,.0f} 톤</b>
+    </div>""", unsafe_allow_html=True)
+
+with c2:
+    st.markdown(f"""<div class="premium-card">
+        <div class="card-title">💵 {selected_year}년 재무 요약</div>
+        - 투자 비용: <b>{curr['투자 비용']:.1f} 억 원</b><br>
+        - 감축 비용: <b>{curr['감축 비용']:.1f} 억 원</b><br>
+        - 순 비용: <b>{curr['연도별 비용']:.1f} 억 원</b>
+    </div>""", unsafe_allow_html=True)
