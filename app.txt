@@ -1,0 +1,80 @@
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
+# --- 0. 페이지 설정 ---
+st.set_page_config(page_title="COWAY Net-Zero Dashboard", layout="wide")
+
+# 화이트 모드 및 디자인 커스텀
+st.markdown("""
+<style>
+    .main { background-color: #FFFFFF; }
+    .stSidebar { background-color: #F8FAFC; border-right: 1px solid #E2E8F0; }
+    [data-testid="stStatusWidget"] { visibility: hidden; }
+    h1, h2, h3 { color: #111827; font-family: 'Pretendard', sans-serif; }
+    .info-box { background-color: #F1F5F9; border-radius: 10px; padding: 20px; border-left: 5px solid #0047BA; }
+</style>
+""", unsafe_allow_html=True)
+
+# --- 1. 데이터 정의 (엑셀 데이터 하드코딩 - 절대 에러 안남) ---
+years = [str(y) for y in range(2023, 2051)]
+bau = [20000] * 28 # 차장님 요청: 2만톤 고정
+target = [18000, 17138.8, 16236.7, 15334.7, 14432.6, 13530.6, 12628.6, 11726.5, 10824.5, 9922.4, 9000, 7746.5, 7542.8, 7304.5, 7062.2, 6806.9, 6542.2, 6267.7, 5979.8, 5677.8, 5361.6, 5026.1, 4670.3, 4292.9, 3892.4, 3466.9, 3014.2, 0]
+
+# 감축 수단별 (단위: 톤)
+solar = [0, 282.8, 565.6, 848.4, 1131.2, 1414, 1696.8, 1979.6, 2262.4, 3074.1, 3885.8, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 5323.2, 5715.5, 6107.8, 6500.1, 6892.4, 7284.7, 7677]
+ev = [0, 485.1, 807, 1044.9, 1228.8, 1355.7, 1430.6, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5]
+ppa = [0, 0, 0, 0, 0, 0, 0, 0, 299.9, 599.9, 899.8, 1290.9, 1569, 1956.8, 2342.1, 2751.8, 3162.5, 3600.2, 4040.8, 4498.5, 4968.2, 5085.6, 5223.9, 5393.6, 5595.5, 5829.9, 6101.8, 6411.8]
+rec = [0, 304, 865, 1511, 2221, 2988, 3807, 4673, 5267, 5332, 5417, 5509, 5709, 5834, 5966, 6086, 6215, 6326, 6448, 6567, 6688, 6789, 6889, 6979, 7059, 7132, 7197, 9783]
+eff = [0, 64, 75, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85]
+
+# 투자비 (단위: 백만원)
+cost_solar = [6.3, 104.5, 585.3, 546.8, 612.9, 382.2, 286.7, 209.2, 131.8, 36, 179.5, 374.4, 390.6, 422.3, 501.9, 566, 645.7, 725.3, 789.4, 869.1, 933.2, 1012.8, 1092.5, 1156.6, 1236.3, 1300.4, 1380, 1332.4]
+cost_total = [64, 194, 585, 547, 613, 382, 287, 209, 132, 36, 180, 374, 391, 422, 502, 566, 646, 725, 789, 869, 933, 1013, 1093, 1157, 1236, 1300, 1380, 1332]
+
+# 연도별 이슈 (15, 23행)
+roadmap_notes = ["2023 넷제로 선언", "태양광 준공 완료", "EV 150대 도입", "효율화 사업 착수"] * 7
+invest_notes = ["64억 예산 집행", "104억 투자 완료", "최대 투자기", "효율화 투자"] * 7
+
+# --- 2. 사이드바 (메뉴 선택) ---
+with st.sidebar:
+    st.title("COWAY Net-Zero")
+    menu = st.radio("보고서 항목", ["1. 넷제로 로드맵", "2. 감축 수단 상세", "3. 투자 및 비용"])
+    st.markdown("---")
+    sel_year = st.select_slider("조회 연도 선택", options=years, value="2030")
+    idx = years.index(sel_year)
+
+# --- 3. 메인 화면 ---
+st.title(f"📊 {menu}")
+
+if menu == "1. 넷제로 로드맵":
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=years, y=bau, name="BAU (예상)", line=dict(color="#94A3B8", dash="dash")))
+    fig.add_trace(go.Scatter(x=years, y=target, name="Target (목표)", line=dict(color="#059669", width=4)))
+    fig.add_trace(go.Bar(x=years, y=[b-t for b, t in zip(bau, target)], name="감축 필요량 (Gap)", marker_color="#3B82F6", opacity=0.6))
+    fig.update_layout(hovermode="x unified", height=500, template="none", yaxis_title="톤 (tCO2eq)")
+    st.plotly_chart(fig, use_container_width=True)
+
+elif menu == "2. 감축 수단 상세":
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=years, y=solar, name="태양광", marker_color="#10B981"))
+    fig.add_trace(go.Bar(x=years, y=ev, name="전기차", marker_color="#34D399"))
+    fig.add_trace(go.Bar(x=years, y=ppa, name="PPA", marker_color="#064E3B"))
+    fig.add_trace(go.Bar(x=years, y=rec, name="REC", marker_color="#FBBF24"))
+    fig.update_layout(barmode="stack", hovermode="x unified", height=500, template="none", yaxis_title="톤 (tCO2eq)")
+    st.plotly_chart(fig, use_container_width=True)
+
+else:
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=years, y=cost_solar, name="항목별 투자비", marker_color="#2563EB"))
+    fig.add_trace(go.Scatter(x=years, y=cost_total, name="총 투자 합계", line=dict(color="#D32F2F", width=2)))
+    fig.update_layout(hovermode="x unified", height=500, template="none", yaxis_title="백만원")
+    st.plotly_chart(fig, use_container_width=True)
+
+# --- 4. 하단 상세 이슈 박스 ---
+st.markdown("---")
+c1, c2 = st.columns(2)
+with c1:
+    st.markdown(f"""<div class="info-box"><strong>📌 {sel_year}년 로드맵 이슈</strong><br><br>{roadmap_notes[idx]}</div>""", unsafe_allow_html=True)
+with c2:
+    st.markdown(f"""<div class="info-box"><strong>💰 {sel_year}년 투자 포인트</strong><br><br>{invest_notes[idx]}</div>""", unsafe_allow_html=True)
