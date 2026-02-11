@@ -1,80 +1,220 @@
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COWAY Net-Zero 2050 Master Hub</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --mck-blue: #002d72; --mck-gold: #947b45; --bg: #f5f7fa; --white: #ffffff; --red: #d9534f; --blue: #4a90e2; --gray: #bdc3c7; --yellow: #f1c40f; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); margin: 0; display: flex; height: 100vh; overflow: hidden; color: #333; }
+        
+        /* Sidebar */
+      .sidebar { width: 300px; background: var(--mck-blue); color: white; display: flex; flex-direction: column; padding: 45px 0; flex-shrink: 0; box-shadow: 4px 0 15px rgba(0,0,0,0.15); }
+      .logo-box { padding: 0 35px; margin-bottom: 50px; border-left: 6px solid var(--mck-gold); margin-left: 25px; }
+      .nav-item { padding: 22px 35px; cursor: pointer; transition: 0.3s; opacity: 0.6; font-size: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+      .nav-item:hover { background: rgba(255,255,255,0.1); opacity: 1; }
+      .nav-item.active { background: rgba(255,255,255,0.18); opacity: 1; font-weight: 700; border-right: 6px solid var(--mck-gold); }
 
-# --- 0. 페이지 설정 ---
-st.set_page_config(page_title="COWAY Net-Zero Dashboard", layout="wide")
+        /* Content Area */
+      .main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+      .top-bar { background: white; padding: 20px 50px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+      .page { display: none; padding: 30px 50px; }
+      .page.active { display: block; animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-# 화이트 모드 및 디자인 커스텀
-st.markdown("""
-<style>
-    .main { background-color: #FFFFFF; }
-    .stSidebar { background-color: #F8FAFC; border-right: 1px solid #E2E8F0; }
-    [data-testid="stStatusWidget"] { visibility: hidden; }
-    h1, h2, h3 { color: #111827; font-family: 'Pretendard', sans-serif; }
-    .info-box { background-color: #F1F5F9; border-radius: 10px; padding: 20px; border-left: 5px solid #0047BA; }
-</style>
-""", unsafe_allow_html=True)
+        /* Control Panel */
+      .control-panel { background: white; padding: 25px 50px; border-bottom: 1px solid #dee2e6; }
+      .slider-wrap { display: flex; align-items: center; gap: 30px; }
+      .year-label { font-size: 34px; font-weight: 700; color: var(--mck-blue); min-width: 100px; text-align: right; }
+        input[type=range] { flex: 1; height: 12px; accent-color: var(--mck-blue); cursor: pointer; }
 
-# --- 1. 데이터 정의 (엑셀 데이터 하드코딩 - 절대 에러 안남) ---
-years = [str(y) for y in range(2023, 2051)]
-bau = [20000] * 28 # 차장님 요청: 2만톤 고정
-target = [18000, 17138.8, 16236.7, 15334.7, 14432.6, 13530.6, 12628.6, 11726.5, 10824.5, 9922.4, 9000, 7746.5, 7542.8, 7304.5, 7062.2, 6806.9, 6542.2, 6267.7, 5979.8, 5677.8, 5361.6, 5026.1, 4670.3, 4292.9, 3892.4, 3466.9, 3014.2, 0]
+        /* KPI Cards */
+      .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px; margin-bottom: 30px; }
+      .card { background: white; padding: 25px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 5px solid var(--mck-blue); }
+      .card h4 { margin: 0 0 10px 0; font-size: 13px; color: #666; font-weight: 500; }
+      .card.val { font-size: 30px; font-weight: 700; color: var(--mck-blue); }
+      .card.unit { font-size: 14px; font-weight: 400; color: #999; margin-left: 5px; }
 
-# 감축 수단별 (단위: 톤)
-solar = [0, 282.8, 565.6, 848.4, 1131.2, 1414, 1696.8, 1979.6, 2262.4, 3074.1, 3885.8, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 4930.9, 5323.2, 5715.5, 6107.8, 6500.1, 6892.4, 7284.7, 7677]
-ev = [0, 485.1, 807, 1044.9, 1228.8, 1355.7, 1430.6, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5, 1458.5]
-ppa = [0, 0, 0, 0, 0, 0, 0, 0, 299.9, 599.9, 899.8, 1290.9, 1569, 1956.8, 2342.1, 2751.8, 3162.5, 3600.2, 4040.8, 4498.5, 4968.2, 5085.6, 5223.9, 5393.6, 5595.5, 5829.9, 6101.8, 6411.8]
-rec = [0, 304, 865, 1511, 2221, 2988, 3807, 4673, 5267, 5332, 5417, 5509, 5709, 5834, 5966, 6086, 6215, 6326, 6448, 6567, 6688, 6789, 6889, 6979, 7059, 7132, 7197, 9783]
-eff = [0, 64, 75, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85]
+        /* Chart Container */
+      .chart-box { background: white; padding: 35px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
+        h3 { margin-top: 0; font-size: 22px; color: var(--mck-blue); margin-bottom: 30px; display: flex; align-items: center; }
+        h3::before { content: '📊'; margin-right: 12px; }
 
-# 투자비 (단위: 백만원)
-cost_solar = [6.3, 104.5, 585.3, 546.8, 612.9, 382.2, 286.7, 209.2, 131.8, 36, 179.5, 374.4, 390.6, 422.3, 501.9, 566, 645.7, 725.3, 789.4, 869.1, 933.2, 1012.8, 1092.5, 1156.6, 1236.3, 1300.4, 1380, 1332.4]
-cost_total = [64, 194, 585, 547, 613, 382, 287, 209, 132, 36, 180, 374, 391, 422, 502, 566, 646, 725, 789, 869, 933, 1013, 1093, 1157, 1236, 1300, 1380, 1332]
+        /* Data Table */
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 18px; background: #f8f9fa; border-bottom: 2.5px solid var(--mck-blue); font-size: 13px; }
+        td { padding: 15px; border-bottom: 1px solid #eee; font-size: 14px; }
+      .badge-on { background: #007a33; color: white; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo-box">
+            <h2 style="margin:0; letter-spacing: 1px;">COWAY</h2>
+            <div style="font-size:10px; color:var(--mck-gold); font-weight: 700;">NET-ZERO 2050 MASTER</div>
+        </div>
+        <div class="nav-item active" id="nav-summary" onclick="switchTab('summary')">1. 전사 넷제로 목표 관리</div>
+        <div class="nav-item" id="nav-financial" onclick="switchTab('financial')">2. FINANCIAL IMPACT</div>
+        <div class="nav-item" id="nav-sites" onclick="switchTab('sites')">3. SITE ANALYSIS</div>
+        <div class="nav-item" id="nav-data" onclick="switchTab('data')">4. COMPLIANCE DATA</div>
+        <div style="margin-top:auto; padding: 35px; font-size: 11px; opacity: 0.4;">© 2026 Coway Strategy Hub v7.0</div>
+    </div>
 
-# 연도별 이슈 (15, 23행)
-roadmap_notes = ["2023 넷제로 선언", "태양광 준공 완료", "EV 150대 도입", "효율화 사업 착수"] * 7
-invest_notes = ["64억 예산 집행", "104억 투자 완료", "최대 투자기", "효율화 투자"] * 7
+    <div class="main">
+        <div class="top-bar">
+            <h2 id="tab-title" style="margin:0; font-weight: 700;">전사 넷제로 목표 관리</h2>
+            <span class="badge-on">STRATEGY ALIGNED (SBTi)</span>
+        </div>
 
-# --- 2. 사이드바 (메뉴 선택) ---
-with st.sidebar:
-    st.title("COWAY Net-Zero")
-    menu = st.radio("보고서 항목", ["1. 넷제로 로드맵", "2. 감축 수단 상세", "3. 투자 및 비용"])
-    st.markdown("---")
-    sel_year = st.select_slider("조회 연도 선택", options=years, value="2030")
-    idx = years.index(sel_year)
+        <div class="control-panel">
+            <div style="margin-bottom: 10px; font-weight: 700; color: #555; font-size: 14px;">로드맵 시뮬레이션 연도 선택</div>
+            <div class="slider-wrap">
+                <input type="range" id="year-slider" min="2023" max="2050" value="2023" oninput="updateAll(this.value)">
+                <span class="year-label" id="year-disp">2023</span>
+            </div>
+        </div>
 
-# --- 3. 메인 화면 ---
-st.title(f"📊 {menu}")
+        <div id="summary" class="page active">
+            <div class="kpi-row">
+                <div class="card"><h4>예상 배출량(BAU)</h4><div class="val" id="k-bau">18,041</div><span class="unit">tCO2eq</span></div>
+                <div class="card"><h4>목표 배출량(Target)</h4><div class="val" id="k-target">18,000</div><span class="unit">tCO2eq</span></div>
+                <div class="card"><h4>감축 필요 격차(Gap)</h4><div class="val" id="k-gap" style="color:var(--red)">41</div><span class="unit">tCO2eq</span></div>
+                <div class="card"><h4>감축 이행률</h4><div class="val" id="k-rate">0.2</div><span class="unit">%</span></div>
+            </div>
+            <div class="chart-box">
+                <h3>온실가스 감축 로드맵 분석</h3>
+                <div style="height: 500px;"><canvas id="roadmapChart"></canvas></div>
+            </div>
+        </div>
 
-if menu == "1. 넷제로 로드맵":
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=years, y=bau, name="BAU (예상)", line=dict(color="#94A3B8", dash="dash")))
-    fig.add_trace(go.Scatter(x=years, y=target, name="Target (목표)", line=dict(color="#059669", width=4)))
-    fig.add_trace(go.Bar(x=years, y=[b-t for b, t in zip(bau, target)], name="감축 필요량 (Gap)", marker_color="#3B82F6", opacity=0.6))
-    fig.update_layout(hovermode="x unified", height=500, template="none", yaxis_title="톤 (tCO2eq)")
-    st.plotly_chart(fig, use_container_width=True)
+        <div id="financial" class="page">
+            <div class="kpi-row">
+                <div class="card"><h4>당해 투자비</h4><div class="val" id="f-capex">0</div><span class="unit">억원</span></div>
+                <div class="card"><h4>당해 절감액</h4><div class="val" id="f-opex">0</div><span class="unit">억원</span></div>
+                <div class="card"><h4>누적 재무효과</h4><div class="val" id="f-net">0</div><span class="unit">억원</span></div>
+                <div class="card"><h4>리스크 방어 추정</h4><div class="val" id="f-risk">0.2</div><span class="unit">억원</span></div>
+            </div>
+            <div class="chart-box">
+                <h3>연도별 재무 투자 및 수익성 분석 (ROI)</h3>
+                <div style="height: 400px;"><canvas id="finChart"></canvas></div>
+            </div>
+        </div>
 
-elif menu == "2. 감축 수단 상세":
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=years, y=solar, name="태양광", marker_color="#10B981"))
-    fig.add_trace(go.Bar(x=years, y=ev, name="전기차", marker_color="#34D399"))
-    fig.add_trace(go.Bar(x=years, y=ppa, name="PPA", marker_color="#064E3B"))
-    fig.add_trace(go.Bar(x=years, y=rec, name="REC", marker_color="#FBBF24"))
-    fig.update_layout(barmode="stack", hovermode="x unified", height=500, template="none", yaxis_title="톤 (tCO2eq)")
-    st.plotly_chart(fig, use_container_width=True)
+        <div id="sites" class="page">
+            <div class="chart-box">
+                <h3>사업장별 전력 사용 및 태양광 설치 잠재량</h3>
+                <table>
+                    <thead><tr><th>사업장</th><th>계약전력(kW)</th><th>사용량(MWh)</th><th>전기요금(백만)</th><th>태양광 잠재(kW)</th></tr></thead>
+                    <tbody>
+                        <tr><td>환경기술연구소</td><td>3,200</td><td>3,937</td><td>726</td><td>109.0</td></tr>
+                        <tr><td>유구물류센터</td><td>2,000</td><td>3,532</td><td>685</td><td>993.6</td></tr>
+                        <tr><td>유구공장</td><td>2,050</td><td>3,316</td><td>724</td><td>774.2</td></tr>
+                        <tr><td>인천공장</td><td>1,750</td><td>2,146</td><td>472</td><td>329.0</td></tr>
+                        <tr><td>포천공장</td><td>800</td><td>614</td><td>163</td><td>78.4</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-else:
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=years, y=cost_solar, name="항목별 투자비", marker_color="#2563EB"))
-    fig.add_trace(go.Scatter(x=years, y=cost_total, name="총 투자 합계", line=dict(color="#D32F2F", width=2)))
-    fig.update_layout(hovermode="x unified", height=500, template="none", yaxis_title="백만원")
-    st.plotly_chart(fig, use_container_width=True)
+        <div id="data" class="page">
+            <div class="chart-box">
+                <h3>이행 로드맵 통합 데이터 테이블 (2023-2050)</h3>
+                <div id="table-render" style="max-height: 600px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
 
-# --- 4. 하단 상세 이슈 박스 ---
-st.markdown("---")
-c1, c2 = st.columns(2)
-with c1:
-    st.markdown(f"""<div class="info-box"><strong>📌 {sel_year}년 로드맵 이슈</strong><br><br>{roadmap_notes[idx]}</div>""", unsafe_allow_html=True)
-with c2:
-    st.markdown(f"""<div class="info-box"><strong>💰 {sel_year}년 투자 포인트</strong><br><br>{invest_notes[idx]}</div>""", unsafe_allow_html=True)
+    <script>
+        // 마스터 데이터 세팅 
+        const dataSet = {
+            yrs: Array.from({length: 28}, (_, i) => 2023 + i),
+            target: ,
+            bau: ,
+            investReduc: ,
+            recReduc: ,
+            capex: [0, 0, 0, 13.6, 9.8, 0.5, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+            opex: [0, 0, 0, 1.2, 2.8, 7.1, 11.4, 15.7, 20.0, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4, 24.4]
+        };
+
+        // 옐로우 웨지(잔여 격차) 계산
+        dataSet.gapWedge = dataSet.yrs.map((y, i) => Math.max(0, dataSet.bau[i] - dataSet.target[i] - dataSet.investReduc[i]));
+
+        let roadmapChart, finChart;
+
+        function switchTab(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.getElementById('nav-' + id).classList.add('active');
+            
+            const titleMap = {summary: '전사 넷제로 목표 관리', financial: '넷제로 투자 및 경제성 분석', sites: '사업장별 에너지 분석', data: '통합 이행 데이터 마스터'};
+            document.getElementById('tab-title').innerText = titleMap[id];
+            if(id === 'data') renderTable();
+        }
+
+        function initCharts() {
+            const ctx1 = document.getElementById('roadmapChart').getContext('2d');
+            roadmapChart = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: dataSet.yrs,
+                    datasets:, borderDash: , pointRadius: 0, order: 1 },
+                        { label: '넷제로 목표 배출량', data: dataSet.target, backgroundColor: '#bdc3c7', stack: 's1', order: 2 },
+                        { label: '실제 감축량', data: dataSet.investReduc, backgroundColor: '#4a90e2', stack: 's1', order: 2 },
+                        { label: '추가 감축 필요량(Gap)', data: dataSet.gapWedge, backgroundColor: '#f1c40f', stack: 's1', order: 2 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { tooltip: { mode: 'index', intersect: false }, legend: { position: 'top' } },
+                    scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: '단위: 톤' } } }
+                }
+            });
+
+            const ctx2 = document.getElementById('finChart').getContext('2d');
+            finChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: dataSet.yrs,
+                    datasets:
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function updateAll(year) {
+            const idx = year - 2023;
+            document.getElementById('year-disp').innerText = year;
+            
+            // KPI 업데이트
+            const b = dataSet.bau[idx];
+            const t = dataSet.target[idx];
+            const g = Math.max(0, b - t);
+            document.getElementById('k-bau').innerText = b.toLocaleString();
+            document.getElementById('k-target').innerText = t.toLocaleString();
+            document.getElementById('k-gap').innerText = g.toLocaleString();
+            document.getElementById('k-rate').innerText = ((1 - t/18000)*100).toFixed(1);
+
+            // 재무 업데이트
+            document.getElementById('f-capex').innerText = dataSet.capex[idx];
+            document.getElementById('f-opex').innerText = dataSet.opex[idx];
+            const net = (dataSet.opex.slice(0, idx+1).reduce((a,b)=>a+b, 0) - dataSet.capex.slice(0, idx+1).reduce((a,b)=>a+b, 0)).toFixed(1);
+            document.getElementById('f-net').innerText = net;
+            document.getElementById('f-risk').innerText = (g * 0.05).toFixed(1);
+        }
+
+        function renderTable() {
+            let h = '<table><thead><tr><th>연도</th><th>BAU</th><th>Target</th><th>감축량</th><th>잔여격차</th><th>누적이익</th></tr></thead><tbody>';
+            dataSet.yrs.forEach((y, i) => {
+                const net = (dataSet.opex.slice(0, i+1).reduce((a,b)=>a+b, 0) - dataSet.capex.slice(0, i+1).reduce((a,b)=>a+b, 0)).toFixed(1);
+                h += `<tr><td>${y}</td><td>${dataSet.bau[i].toLocaleString()}</td><td>${dataSet.target[i].toLocaleString()}</td><td>${dataSet.investReduc[i].toLocaleString()}</td><td style="color:red">${dataSet.gapWedge[i].toLocaleString()}</td><td>${net}억</td></tr>`;
+            });
+            document.getElementById('table-render').innerHTML = h + '</tbody></table>';
+        }
+
+        window.onload = () => { initCharts(); updateAll(2023); };
+    </script>
+</body>
+</html>
